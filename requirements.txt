@@ -1,0 +1,16 @@
+# Python dependencies for TRAINING-Go2 (Phase 1: Go2 bare-metal walking).
+# Mirrors TRAINING-Aliengo/requirements.txt; adds matplotlib + pillow, which
+# eval_policy.py needs for the gait plot and (with --render) the contact sheet
+# and rollout gif.
+#
+# Tested on Windows (CPU) with: mujoco 3.9, gymnasium 1.2, stable-baselines3 2.8,
+# torch 2.12+cpu, numpy 2.4, matplotlib 3.10, pillow 12.  tensorboard / tqdm /
+# rich come in via stable-baselines3[extra].
+
+mujoco>=3.2
+gymnasium>=0.29
+stable-baselines3[extra]>=2.3
+torch>=2.2
+numpy>=1.26
+matplotlib>=3.7
+pillow>=10.0
