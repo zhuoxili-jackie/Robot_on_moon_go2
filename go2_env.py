@@ -88,7 +88,7 @@ class Go2WalkEnv(gym.Env):
             (-0.6, 0.6),
         ),
         render_mode: str | None = None,
-        min_base_height: float = 0.12,
+        min_base_height: float = 0.18,
     ) -> None:
         self.xml_path = Path(xml_path) if xml_path is not None else DEFAULT_SCENE
         self.model = _load_model(self.xml_path)
@@ -244,6 +244,24 @@ class Go2WalkEnv(gym.Env):
                 contacts[foot_to_index[geom1]] = 1.0
         return contacts
 
+    def _nonfoot_ground_contact_penalty(self) -> float:
+        """Count robot collision geoms OTHER THAN the four feet that touch the
+        terrain. Healthy walking is on the foot spheres only; calf / thigh / base
+        contact with the ground means the dog is crawling -- penalize it (without
+        terminating, so the policy has time to learn to lift its legs)."""
+        if self.terrain_geom_id < 0:
+            return 0.0
+        foot_set = {int(g) for g in self.foot_geom_ids}
+        count = 0
+        for i in range(self.data.ncon):
+            c = self.data.contact[i]
+            g1, g2 = int(c.geom1), int(c.geom2)
+            if g1 == self.terrain_geom_id and g2 not in foot_set:
+                count += 1
+            elif g2 == self.terrain_geom_id and g1 not in foot_set:
+                count += 1
+        return float(min(count, 4))
+
     def _get_obs(self) -> np.ndarray:
         projected_gravity = self._projected_gravity()
         base_linear, base_angular = self._base_velocity_body()
@@ -280,20 +298,22 @@ class Go2WalkEnv(gym.Env):
         projected_gravity = self._projected_gravity()
         upright = float(np.clip(-projected_gravity[2], 0.0, 1.0))
         height_error = abs(float(self.data.qpos[2]) - self.stand_height)
-        height = float(np.exp(-(height_error * height_error) / 0.09))
+        height = float(np.exp(-(height_error * height_error) / 0.04))
 
         action_rate = float(np.sum(np.square(action - self.last_action)))
         action_size = float(np.sum(np.square(action)))
         joint_speed = float(np.sum(np.square(self.data.qvel[self.joint_dof_adr])))
+        nonfoot_contact = self._nonfoot_ground_contact_penalty()
         unhealthy = 1.0 if self._is_unhealthy() else 0.0
 
         reward = (
             2.0 * tracking
             + 0.5 * upright
-            + 0.25 * height
+            + 0.4 * height
             - 0.03 * action_rate
             - 0.005 * action_size
             - 0.0005 * joint_speed
+            - 0.5 * nonfoot_contact
             - 2.0 * unhealthy
         )
 
@@ -304,6 +324,7 @@ class Go2WalkEnv(gym.Env):
             "penalty_action_rate": action_rate,
             "penalty_action_size": action_size,
             "penalty_joint_speed": joint_speed,
+            "penalty_nonfoot_contact": nonfoot_contact,
         }
 
     def _is_unhealthy(self) -> bool:

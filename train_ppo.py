@@ -32,7 +32,9 @@ def make_env(xml_path: Path | None, seed: int, rank: int):
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train Go2 walking with PPO.")
     parser.add_argument("--xml", type=Path, default=None, help="scene path (default: go2_flat_scene.xml)")
-    parser.add_argument("--total-timesteps", type=int, default=5_000_000)
+    parser.add_argument("--total-timesteps", type=int, default=3_500_000,
+                        help="default 3.5M ~= converged (>=97%% of the 5M reward; 5M adds only ~2-3pp). "
+                             "Use 2.5M for fast config screening (~93%%). See RESULTS.md convergence note.")
     parser.add_argument("--num-envs", type=int, default=4) # 这里可以增加至64、1024等
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--run-name", type=str, default="go2_walk")

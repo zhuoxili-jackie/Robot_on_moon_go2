@@ -294,7 +294,7 @@
        in body order FL,FR,RL,RR; the stance is symmetric so order is moot here.
        ctrl is all zeros: with the PD actuators above, ctrl=0 commands the stand pose. -->
   <keyframe>
-    <key name="stand" qpos="0 0 0.4 1 0 0 0 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8"
+    <key name="stand" qpos="0 0 0.27 1 0 0 0 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8"
       ctrl="0 0 0 0 0 0 0 0 0 0 0 0" />
   </keyframe>
 </mujoco>

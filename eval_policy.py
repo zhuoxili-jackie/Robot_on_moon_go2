@@ -229,18 +229,27 @@ def main() -> None:
     parser.add_argument("--run", type=str, default="go2_walk")
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument("--render", action="store_true", help="also dump rendered frames")
+    parser.add_argument("--model", type=str, default=None,
+                        help="explicit policy .zip to evaluate (default: runs/<run>/ppo_go2_final.zip)")
+    parser.add_argument("--vecnormalize", type=str, default=None,
+                        help="explicit VecNormalize .pkl (default: runs/<run>/vecnormalize.pkl)")
     args = parser.parse_args()
 
     run_dir = Path("runs") / args.run
     out_dir = args.out or Path("eval_out") / args.run
 
+    model_path = args.model or str(run_dir / "ppo_go2_final.zip")
+    vecnorm_path = args.vecnormalize or str(run_dir / "vecnormalize.pkl")
+    print(f"== loading policy: {model_path}")
+    print(f"== loading vecnormalize: {vecnorm_path}")
+
     patch_sb3_zip_loader()
     env = Go2WalkEnv(xml_path=args.xml)
     vec = DummyVecEnv([lambda: env])
-    vec_norm = VecNormalize.load(str(run_dir / "vecnormalize.pkl"), vec)
+    vec_norm = VecNormalize.load(vecnorm_path, vec)
     vec_norm.training = False
     vec_norm.norm_reward = False
-    model = PPO.load(str(run_dir / "ppo_go2_final.zip"), device="cpu")
+    model = PPO.load(model_path, device="cpu")
 
     print("== model / scene sanity ==")
     print("gravity:", env.model.opt.gravity, " total mass:", round(float(env.model.body_mass.sum()), 2), "kg")
