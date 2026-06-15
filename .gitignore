@@ -8,6 +8,9 @@ diagnostics/
 # 验收产物（gif / 蒙太奇 / metrics.json）——关键数值已在 RESULTS.md 留存
 eval_out/
 
+# 训练日志（本地留存，不纳入版本库）——今后训练 stdout 一律重定向到 logs/ 下
+logs/
+
 # 训练产物：每个 run 只追踪 final 模型 + vecnormalize.pkl；忽略 checkpoints/ 与 tensorboard/
 # （对今后任意新 run 文件夹自动生效）
 runs/**/checkpoints/

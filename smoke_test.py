@@ -1,7 +1,7 @@
 """Short random-action check for the Go2 walking environment.
 
 Phase 1 / Step 2 acceptance: confirm Go2WalkEnv loads, resets, steps, and returns
-a 52-d observation with finite rewards. Run:
+a finite observation with expected shape (52 for Gen A, 54 for Gen B+). Run:
 
     python smoke_test.py
 """
@@ -46,8 +46,9 @@ def main() -> None:
           f"{rewards.min():.3f}/{rewards.mean():.3f}/{rewards.max():.3f}")
     print(f"last_info={ {k: round(v, 3) for k, v in info.items()} }")
 
-    ok = obs.shape == (52,) and np.isfinite(rewards).all()
-    print("RESULT:", "PASS - env loads, steps, 52-d finite obs/reward." if ok else "FAIL")
+    expected_obs_dim = env.observation_space.shape[0]
+    ok = obs.shape == (expected_obs_dim,) and np.isfinite(rewards).all()
+    print("RESULT:", f"PASS - env loads, steps, {expected_obs_dim}-d finite obs/reward." if ok else "FAIL")
     env.close()
 
 

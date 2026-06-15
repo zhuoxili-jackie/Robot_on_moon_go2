@@ -61,7 +61,7 @@
   </asset>
 
   <worldbody>
-    <body name="base_link" pos="0 0 0.445" childclass="go2">
+    <body name="base_link" pos="0 0 0.38" childclass="go2">
       <inertial pos="0.021112 0 -0.005366" quat="-0.000543471 0.713435 -0.00173769 0.700719"
         mass="6.921"
         diaginertia="0.107027 0.0980771 0.0244531" />
@@ -223,23 +223,25 @@
        env's action model works: force = kp*ctrl + biasprm0 + biasprm1*q + biasprm2*qd
        = kp*(ctrl + q_stand - q) - kd*qd, where biasprm = [kp*q_stand, -kp, -kd].
        => ctrl=0 holds the 'stand' keyframe; action = offset around stand.
-       Stand pose per leg: hip=0, thigh=0.9, calf=-1.8.
-       kp=20, kd=0.5 (the menagerie/legged_gym default).
+       Stand pose per leg: hip=0, thigh=0.8, calf=-1.5.
+       kp=35, kd=0.75 (Gen G: raised from 25/0.5 to reduce gravitational sag → lower action_sat).
        ctrlrange = jointrange - q_stand (keeps the position target within joint limits);
-       forcerange = native motor torque limits (hip/thigh +/-23.7, calf +/-45.43 Nm). -->
+       forcerange = native motor torque limits (hip/thigh +/-23.7, calf +/-45.43 Nm).
+       NOTE: back legs (RL/RR) use back_hip range [-0.5236,4.5379]-0.8=[-1.3236,3.7379],
+             NOT the front_hip range; front legs (FL/FR) use front_hip range. -->
   <actuator>
-    <general name="FR_hip"   joint="FR_hip_joint"   gaintype="fixed" biastype="affine" gainprm="20" biasprm="0 -20 -0.5"   ctrlrange="-1.0472 1.0472"  forcerange="-23.7 23.7" />
-    <general name="FR_thigh" joint="FR_thigh_joint" gaintype="fixed" biastype="affine" gainprm="20" biasprm="18 -20 -0.5"  ctrlrange="-2.4708 2.5907"  forcerange="-23.7 23.7" />
-    <general name="FR_calf"  joint="FR_calf_joint"  gaintype="fixed" biastype="affine" gainprm="20" biasprm="-36 -20 -0.5" ctrlrange="-0.9227 0.96224" forcerange="-45.43 45.43" />
-    <general name="FL_hip"   joint="FL_hip_joint"   gaintype="fixed" biastype="affine" gainprm="20" biasprm="0 -20 -0.5"   ctrlrange="-1.0472 1.0472"  forcerange="-23.7 23.7" />
-    <general name="FL_thigh" joint="FL_thigh_joint" gaintype="fixed" biastype="affine" gainprm="20" biasprm="18 -20 -0.5"  ctrlrange="-2.4708 2.5907"  forcerange="-23.7 23.7" />
-    <general name="FL_calf"  joint="FL_calf_joint"  gaintype="fixed" biastype="affine" gainprm="20" biasprm="-36 -20 -0.5" ctrlrange="-0.9227 0.96224" forcerange="-45.43 45.43" />
-    <general name="RR_hip"   joint="RR_hip_joint"   gaintype="fixed" biastype="affine" gainprm="20" biasprm="0 -20 -0.5"   ctrlrange="-1.0472 1.0472"  forcerange="-23.7 23.7" />
-    <general name="RR_thigh" joint="RR_thigh_joint" gaintype="fixed" biastype="affine" gainprm="20" biasprm="18 -20 -0.5"  ctrlrange="-1.4236 3.6379"  forcerange="-23.7 23.7" />
-    <general name="RR_calf"  joint="RR_calf_joint"  gaintype="fixed" biastype="affine" gainprm="20" biasprm="-36 -20 -0.5" ctrlrange="-0.9227 0.96224" forcerange="-45.43 45.43" />
-    <general name="RL_hip"   joint="RL_hip_joint"   gaintype="fixed" biastype="affine" gainprm="20" biasprm="0 -20 -0.5"   ctrlrange="-1.0472 1.0472"  forcerange="-23.7 23.7" />
-    <general name="RL_thigh" joint="RL_thigh_joint" gaintype="fixed" biastype="affine" gainprm="20" biasprm="18 -20 -0.5"  ctrlrange="-1.4236 3.6379"  forcerange="-23.7 23.7" />
-    <general name="RL_calf"  joint="RL_calf_joint"  gaintype="fixed" biastype="affine" gainprm="20" biasprm="-36 -20 -0.5" ctrlrange="-0.9227 0.96224" forcerange="-45.43 45.43" />
+    <general name="FR_hip"   joint="FR_hip_joint"   gaintype="fixed" biastype="affine" gainprm="35" biasprm="0 -35 -0.75"    ctrlrange="-1.0472 1.0472"  forcerange="-23.7 23.7" />
+    <general name="FR_thigh" joint="FR_thigh_joint" gaintype="fixed" biastype="affine" gainprm="35" biasprm="28 -35 -0.75"   ctrlrange="-2.3708 2.6907"  forcerange="-23.7 23.7" />
+    <general name="FR_calf"  joint="FR_calf_joint"  gaintype="fixed" biastype="affine" gainprm="35" biasprm="-52.5 -35 -0.75" ctrlrange="-1.2227 0.66224" forcerange="-45.43 45.43" />
+    <general name="FL_hip"   joint="FL_hip_joint"   gaintype="fixed" biastype="affine" gainprm="35" biasprm="0 -35 -0.75"    ctrlrange="-1.0472 1.0472"  forcerange="-23.7 23.7" />
+    <general name="FL_thigh" joint="FL_thigh_joint" gaintype="fixed" biastype="affine" gainprm="35" biasprm="28 -35 -0.75"   ctrlrange="-2.3708 2.6907"  forcerange="-23.7 23.7" />
+    <general name="FL_calf"  joint="FL_calf_joint"  gaintype="fixed" biastype="affine" gainprm="35" biasprm="-52.5 -35 -0.75" ctrlrange="-1.2227 0.66224" forcerange="-45.43 45.43" />
+    <general name="RR_hip"   joint="RR_hip_joint"   gaintype="fixed" biastype="affine" gainprm="35" biasprm="0 -35 -0.75"    ctrlrange="-1.0472 1.0472"  forcerange="-23.7 23.7" />
+    <general name="RR_thigh" joint="RR_thigh_joint" gaintype="fixed" biastype="affine" gainprm="35" biasprm="28 -35 -0.75"   ctrlrange="-1.3236 3.7379"  forcerange="-23.7 23.7" />
+    <general name="RR_calf"  joint="RR_calf_joint"  gaintype="fixed" biastype="affine" gainprm="35" biasprm="-52.5 -35 -0.75" ctrlrange="-1.2227 0.66224" forcerange="-45.43 45.43" />
+    <general name="RL_hip"   joint="RL_hip_joint"   gaintype="fixed" biastype="affine" gainprm="35" biasprm="0 -35 -0.75"    ctrlrange="-1.0472 1.0472"  forcerange="-23.7 23.7" />
+    <general name="RL_thigh" joint="RL_thigh_joint" gaintype="fixed" biastype="affine" gainprm="35" biasprm="28 -35 -0.75"   ctrlrange="-1.3236 3.7379"  forcerange="-23.7 23.7" />
+    <general name="RL_calf"  joint="RL_calf_joint"  gaintype="fixed" biastype="affine" gainprm="35" biasprm="-52.5 -35 -0.75" ctrlrange="-1.2227 0.66224" forcerange="-45.43 45.43" />
   </actuator>
 
   <sensor>
@@ -294,7 +296,7 @@
        in body order FL,FR,RL,RR; the stance is symmetric so order is moot here.
        ctrl is all zeros: with the PD actuators above, ctrl=0 commands the stand pose. -->
   <keyframe>
-    <key name="stand" qpos="0 0 0.27 1 0 0 0 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8"
+    <key name="stand" qpos="0 0 0.38 1 0 0 0 0 0.8 -1.5 0 0.8 -1.5 0 0.8 -1.5 0 0.8 -1.5"
       ctrl="0 0 0 0 0 0 0 0 0 0 0 0" />
   </keyframe>
 </mujoco>

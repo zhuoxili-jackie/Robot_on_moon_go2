@@ -1,11 +1,12 @@
 # Robot on Moon — Go2 运控训练（TRAINING-Go2）
 
 宇树 **Go2** 四足在 **MuJoCo + Gymnasium + Stable-Baselines3（PPO）** 上的运控训练包。
-本仓库是「Robot on Moon」项目的 Go2 训练子包，总目标是让 Go2 在**月面地形**行走，分三个阶段推进：
+本仓库是「Robot on Moon」项目的 Go2 训练子包，总目标是让 Go2 在**月面地形**行走，分四个阶段推进：
 
 - **Phase 1 — 裸机平地行走**（当前）：不带机械臂的 Go2 在平地稳定全向行走。
 - **Phase 2 — 月面迁移**：接入月球高度场地形，验证迁移 / 重整。
 - **Phase 3 — Go2 + Z1**：装上 Z1 机械臂做整机 loco-manipulation。
+- **Phase 4 — 键盘实时运控**：在 MuJoCo viewer 中接入键盘事件，仿真运行时实时调整速度指令（vx / vy / yaw_rate），实现人机交互驾驶。
 
 > 不使用 Isaac；团队自研的轻量 MuJoCo 训练场。默认简体中文。
 
