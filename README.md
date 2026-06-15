@@ -3,10 +3,12 @@
 宇树 **Go2** 四足在 **MuJoCo + Gymnasium + Stable-Baselines3（PPO）** 上的运控训练包。
 本仓库是「Robot on Moon」项目的 Go2 训练子包，总目标是让 Go2 在**月面地形**行走，分四个阶段推进：
 
-- **Phase 1 — 裸机平地行走**（当前）：不带机械臂的 Go2 在平地稳定全向行走。
-- **Phase 2 — 月面迁移**：接入月球高度场地形，验证迁移 / 重整。
-- **Phase 3 — Go2 + Z1**：装上 Z1 机械臂做整机 loco-manipulation。
-- **Phase 4 — 键盘实时运控**：在 MuJoCo viewer 中接入键盘事件，仿真运行时实时调整速度指令（vx / vy / yaw_rate），实现人机交互驾驶。
+> **执行顺序（杜老师调整）：Phase 1 ✅ → Phase 3（当前）→ Phase 2 → Phase 4。** 阶段编号不变，只换顺序。
+
+- **Phase 1 — 裸机平地行走** ✅ 已完成（仓库 v1.4：定型 G/J/N 三套配置）：不带机械臂的 Go2 在平地稳定全向行走。
+- **Phase 3 — Go2 + Z1**（**当前**）：把 Z1 机械臂作为**配重**装到 go2、平地重训行走（本步不控臂；规划见根目录 `CONTINUATION_PROMPT_robot_on_moon.md` §二）。
+- **Phase 2 — 月面迁移**（Phase 3 之后）：接入月球高度场地形，验证迁移 / 重整。
+- **Phase 4 — 键盘实时运控**：在 MuJoCo viewer 中接入键盘事件，仿真运行时实时调速 / 转向，人机交互驾驶。
 
 > 不使用 Isaac；团队自研的轻量 MuJoCo 训练场。默认简体中文。
 
@@ -16,8 +18,8 @@
 
 ```powershell
 python -m pip install -r requirements.txt
-python train_ppo.py --total-timesteps 5000000 --num-envs 4 --run-name go2_baseline_5M --checkpoint-freq 250000
-python eval_policy.py --run go2_baseline_5M --render
+python eval_policy.py --run go2_gN_tc55_3p5M --render                                                 # 验收当前最佳（N，随仓库提供）
+python train_ppo.py --total-timesteps 3500000 --num-envs 4 --run-name my_run --checkpoint-freq 250000  # 自己训一版（默认 3.5M）
 ```
 
 ## 验收标准与结果
@@ -30,7 +32,7 @@ python eval_policy.py --run go2_baseline_5M --render
 
 | 路径 | 说明 |
 |---|---|
-| `go2_env.py` | Gymnasium 环境 `Go2WalkEnv`（obs 52 / act 12 / 行走 reward） |
+| `go2_env.py` | Gymnasium 环境 `Go2WalkEnv`（obs 54 / act 12 / 行走 reward） |
 | `train_ppo.py` | PPO 训练入口（SB3，含 `--checkpoint-freq`） |
 | `play_policy.py` | viewer 回放策略 |
 | `eval_policy.py` | 量化验收（指标 + 阈值 + 步态图 / gif） |

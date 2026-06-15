@@ -1,4 +1,4 @@
-# Go2 MuJoCo Locomotion Training (Phase 1: bare-metal walking)
+# Go2 MuJoCo Locomotion Training (Phase 1 ✅ done → Phase 3: add Z1 arm, then Phase 2 lunar)
 
 PPO training setup for the Unitree Go2 on flat ground, ported from
 `TRAINING-Aliengo/`. Same Stable-Baselines3 + MuJoCo stack; the model is the
@@ -8,12 +8,12 @@ an offset around that pose.
 
 ## Files
 
-- `go2_env.py` — Gymnasium env (`Go2WalkEnv`): 52-d obs, 12-d action, walking reward.
+- `go2_env.py` — Gymnasium env (`Go2WalkEnv`): 54-d obs, 12-d action, walking reward.
 - `train_ppo.py` — PPO training entry point (Stable-Baselines3).
 - `play_policy.py` — load and replay a trained policy in the MuJoCo viewer.
 - `eval_policy.py` — headless QUANTITATIVE acceptance: fixed-command rollouts,
   metrics + thresholds + gait plot / contact sheet / gif.
-- `smoke_test.py` — random-action check: env loads, steps, 52-d finite obs/reward.
+- `smoke_test.py` — random-action check: env loads, steps, 54-d finite obs/reward.
 - `diagnostics/smoke_stand.py` — standing check: `ctrl=0` holds the stance (PD gain sanity).
 - `diagnostics/inspect_model.py` — dumps `go2.xml` structure (actuator/joint/keyframe/foot order).
 - `go2.xml`, `go2_flat_scene.xml`, `go2_assets/` — model + flat scene + meshes.
@@ -33,7 +33,7 @@ first, then run the requirements command.
 ```powershell
 python diagnostics/inspect_model.py   # model loads; prints actuator/joint/keyframe facts
 python diagnostics/smoke_stand.py     # ctrl=0 holds the stand pose (validate kp/kd)
-python smoke_test.py                  # 200 random steps; 52-d finite obs/reward
+python smoke_test.py                  # 200 random steps; 54-d finite obs/reward
 ```
 
 > **Windows + non-ASCII path:** this repo lives under a Chinese path and MuJoCo's
@@ -47,9 +47,9 @@ python smoke_test.py                  # 200 random steps; 52-d finite obs/reward
 # health check first
 python train_ppo.py --total-timesteps 100000 --num-envs 4
 
-# full baseline (~1 h on CPU)
-python train_ppo.py --total-timesteps 5000000 --num-envs 4 `
-    --run-name go2_baseline_5M --checkpoint-freq 250000
+# full run (~22 min on CPU; 3.5M is the default)
+python train_ppo.py --total-timesteps 3500000 --num-envs 4 `
+    --run-name my_run --checkpoint-freq 250000
 ```
 
 Outputs → `runs/<run-name>/`:
@@ -67,15 +67,15 @@ for SB3's per-vec-step counter (e.g. `250000` with 4 envs → a checkpoint every
 ## Replay
 
 ```powershell
-python play_policy.py --model runs/go2_baseline_5M/ppo_go2_final.zip `
-    --vecnormalize runs/go2_baseline_5M/vecnormalize.pkl
+python play_policy.py --model runs/go2_gN_tc55_3p5M/ppo_go2_final.zip `
+    --vecnormalize runs/go2_gN_tc55_3p5M/vecnormalize.pkl
 ```
 
 ## Evaluate (quantitative acceptance)
 
 ```powershell
-python eval_policy.py --run go2_baseline_5M            # metrics + gait plot
-python eval_policy.py --run go2_baseline_5M --render   # + contact sheet + gif
+python eval_policy.py --run go2_gN_tc55_3p5M            # metrics + gait plot
+python eval_policy.py --run go2_gN_tc55_3p5M --render   # + contact sheet + gif
 ```
 
 Runs 5 deterministic fixed-command episodes (fwd 0.3 / 0.5 / 0.8, fwd+yaw,
@@ -90,11 +90,11 @@ diagnostic (foot gaps at the `stand` keyframe) to catch a wrong spawn height.
 - **PD actuators:** `go2.xml` uses `gaintype=fixed biastype=affine`, so
   `force = kp·(ctrl + q_stand − q) − kd·q̇` and `ctrl=0` holds the stand pose.
   The action is an offset around stand, clipped to each actuator's `ctrlrange`.
-- **Baseline (kp=20) crawls:** the current go2_1M baseline tracks forward speed
-  well but sags to ~0.20 m and tends to walk on its calves. See
-  the repo-root `ref/CHANGELOG_from_go2_1M.md` for the anti-crawl changes (kp→50, narrower/heavier
-  height reward, non-foot contact penalty, base_z, action_scale) and how to
-  re-apply them selectively.
+- **Final config (Phase 1, v1.4):** kp=35/kd=0.75, stand base_z=0.38, legs
+  `[0,0.8,-1.5]`; `action_scale` selects the three shipped configs — **N**
+  `[0.125,0.55,0.55]` (live default), **J/G** `[0.125,0.45,0.45]` (5M / 3.5M).
+  All walk a symmetric trot, never fall, action_sat 0.66–0.72. See `RESULTS.md`
+  for the full Gen A–O history.
 - **Curriculum idea:** start forward-only with a narrow command range, then add
   yaw and lateral commands; tighten posture / add terrain last.
 - **Keep `vecnormalize.pkl` with its model** — replay/eval are wrong without the
