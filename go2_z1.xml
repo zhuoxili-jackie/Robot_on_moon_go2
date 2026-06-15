@@ -306,22 +306,26 @@
     </body>
   </worldbody>
 
-  <!-- Position-servo (PD) actuators identical to go2.xml (kp=35, kd=0.75; ctrl=0 -> 'stand').
-       This is a SEPARATE copy: tune kp/kd HERE for the payload (Z2/Z3) without touching
-       Phase 1's go2.xml gait. 12 leg actuators only; the arm has none. -->
+  <!-- Position-servo (PD) actuators. SEPARATE copy from Phase-1 go2.xml so the payload
+       gains can be tuned without touching the bare-robot gait. Z3 result: kp 35->45,
+       kd 0.75->0.9 (biasprm[0] = kp*q_stand recomputed: hip 0, thigh 45*0.8=36,
+       calf 45*-1.5=-67.5). The +29% stiffness gives the legs enough authority to hold
+       the ~5 kg arm upright; it fixes the passive ~15deg back-lean AND the lateral
+       roll-over that kp=35 could not (eval: lateral roll 9deg+fall to 0.8deg, 5/5).
+       ctrl=0 -> 'stand'. 12 leg actuators only; the welded arm has none. -->
   <actuator>
-    <general name="FR_hip"   joint="FR_hip_joint"   gaintype="fixed" biastype="affine" gainprm="35" biasprm="0 -35 -0.75"    ctrlrange="-1.0472 1.0472"  forcerange="-23.7 23.7" />
-    <general name="FR_thigh" joint="FR_thigh_joint" gaintype="fixed" biastype="affine" gainprm="35" biasprm="28 -35 -0.75"   ctrlrange="-2.3708 2.6907"  forcerange="-23.7 23.7" />
-    <general name="FR_calf"  joint="FR_calf_joint"  gaintype="fixed" biastype="affine" gainprm="35" biasprm="-52.5 -35 -0.75" ctrlrange="-1.2227 0.66224" forcerange="-45.43 45.43" />
-    <general name="FL_hip"   joint="FL_hip_joint"   gaintype="fixed" biastype="affine" gainprm="35" biasprm="0 -35 -0.75"    ctrlrange="-1.0472 1.0472"  forcerange="-23.7 23.7" />
-    <general name="FL_thigh" joint="FL_thigh_joint" gaintype="fixed" biastype="affine" gainprm="35" biasprm="28 -35 -0.75"   ctrlrange="-2.3708 2.6907"  forcerange="-23.7 23.7" />
-    <general name="FL_calf"  joint="FL_calf_joint"  gaintype="fixed" biastype="affine" gainprm="35" biasprm="-52.5 -35 -0.75" ctrlrange="-1.2227 0.66224" forcerange="-45.43 45.43" />
-    <general name="RR_hip"   joint="RR_hip_joint"   gaintype="fixed" biastype="affine" gainprm="35" biasprm="0 -35 -0.75"    ctrlrange="-1.0472 1.0472"  forcerange="-23.7 23.7" />
-    <general name="RR_thigh" joint="RR_thigh_joint" gaintype="fixed" biastype="affine" gainprm="35" biasprm="28 -35 -0.75"   ctrlrange="-1.3236 3.7379"  forcerange="-23.7 23.7" />
-    <general name="RR_calf"  joint="RR_calf_joint"  gaintype="fixed" biastype="affine" gainprm="35" biasprm="-52.5 -35 -0.75" ctrlrange="-1.2227 0.66224" forcerange="-45.43 45.43" />
-    <general name="RL_hip"   joint="RL_hip_joint"   gaintype="fixed" biastype="affine" gainprm="35" biasprm="0 -35 -0.75"    ctrlrange="-1.0472 1.0472"  forcerange="-23.7 23.7" />
-    <general name="RL_thigh" joint="RL_thigh_joint" gaintype="fixed" biastype="affine" gainprm="35" biasprm="28 -35 -0.75"   ctrlrange="-1.3236 3.7379"  forcerange="-23.7 23.7" />
-    <general name="RL_calf"  joint="RL_calf_joint"  gaintype="fixed" biastype="affine" gainprm="35" biasprm="-52.5 -35 -0.75" ctrlrange="-1.2227 0.66224" forcerange="-45.43 45.43" />
+    <general name="FR_hip"   joint="FR_hip_joint"   gaintype="fixed" biastype="affine" gainprm="45" biasprm="0 -45 -0.9"    ctrlrange="-1.0472 1.0472"  forcerange="-23.7 23.7" />
+    <general name="FR_thigh" joint="FR_thigh_joint" gaintype="fixed" biastype="affine" gainprm="45" biasprm="36 -45 -0.9"   ctrlrange="-2.3708 2.6907"  forcerange="-23.7 23.7" />
+    <general name="FR_calf"  joint="FR_calf_joint"  gaintype="fixed" biastype="affine" gainprm="45" biasprm="-67.5 -45 -0.9" ctrlrange="-1.2227 0.66224" forcerange="-45.43 45.43" />
+    <general name="FL_hip"   joint="FL_hip_joint"   gaintype="fixed" biastype="affine" gainprm="45" biasprm="0 -45 -0.9"    ctrlrange="-1.0472 1.0472"  forcerange="-23.7 23.7" />
+    <general name="FL_thigh" joint="FL_thigh_joint" gaintype="fixed" biastype="affine" gainprm="45" biasprm="36 -45 -0.9"   ctrlrange="-2.3708 2.6907"  forcerange="-23.7 23.7" />
+    <general name="FL_calf"  joint="FL_calf_joint"  gaintype="fixed" biastype="affine" gainprm="45" biasprm="-67.5 -45 -0.9" ctrlrange="-1.2227 0.66224" forcerange="-45.43 45.43" />
+    <general name="RR_hip"   joint="RR_hip_joint"   gaintype="fixed" biastype="affine" gainprm="45" biasprm="0 -45 -0.9"    ctrlrange="-1.0472 1.0472"  forcerange="-23.7 23.7" />
+    <general name="RR_thigh" joint="RR_thigh_joint" gaintype="fixed" biastype="affine" gainprm="45" biasprm="36 -45 -0.9"   ctrlrange="-1.3236 3.7379"  forcerange="-23.7 23.7" />
+    <general name="RR_calf"  joint="RR_calf_joint"  gaintype="fixed" biastype="affine" gainprm="45" biasprm="-67.5 -45 -0.9" ctrlrange="-1.2227 0.66224" forcerange="-45.43 45.43" />
+    <general name="RL_hip"   joint="RL_hip_joint"   gaintype="fixed" biastype="affine" gainprm="45" biasprm="0 -45 -0.9"    ctrlrange="-1.0472 1.0472"  forcerange="-23.7 23.7" />
+    <general name="RL_thigh" joint="RL_thigh_joint" gaintype="fixed" biastype="affine" gainprm="45" biasprm="36 -45 -0.9"   ctrlrange="-1.3236 3.7379"  forcerange="-23.7 23.7" />
+    <general name="RL_calf"  joint="RL_calf_joint"  gaintype="fixed" biastype="affine" gainprm="45" biasprm="-67.5 -45 -0.9" ctrlrange="-1.2227 0.66224" forcerange="-45.43 45.43" />
   </actuator>
 
   <sensor>
