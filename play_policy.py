@@ -26,6 +26,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from stable_baselines3.common.utils import get_device
 
 from go2_env import Go2WalkEnv
+from go2_lunar_env import Go2LunarEnv
 
 
 def patch_sb3_zip_loader() -> None:
@@ -84,6 +85,9 @@ def patch_sb3_zip_loader() -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Replay a trained Go2 PPO policy.")
     parser.add_argument("--xml", type=Path, default=None, help="scene path (default: go2_flat_scene.xml)")
+    parser.add_argument("--lunar", action="store_true",
+                        help="replay on the lunar hfield scene with Go2LunarEnv (spawns the dog "
+                             "at varied places each reset to show terrain traversal).")
     parser.add_argument("--model", type=Path, default=Path("runs/go2_walk/ppo_go2_final.zip"))
     parser.add_argument("--vecnormalize", type=Path, default=Path("runs/go2_walk/vecnormalize.pkl"))
     parser.add_argument("--seconds", type=float, default=60.0)
@@ -91,7 +95,10 @@ def main() -> None:
 
     patch_sb3_zip_loader()
 
-    raw_env = Go2WalkEnv(xml_path=args.xml, render_mode="human")
+    if args.lunar:
+        raw_env = Go2LunarEnv(xml_path=args.xml, render_mode="human")
+    else:
+        raw_env = Go2WalkEnv(xml_path=args.xml, render_mode="human")
     vec_env = DummyVecEnv([lambda: raw_env])
     if args.vecnormalize.exists():
         vec_env = VecNormalize.load(args.vecnormalize, vec_env)

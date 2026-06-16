@@ -14,14 +14,15 @@ from pathlib import Path
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecNormalize
 
 from go2_env import Go2WalkEnv
+from go2_lunar_env import Go2LunarEnv
 
 
-def make_env(xml_path: Path | None, seed: int, rank: int):
+def make_env(xml_path: Path | None, seed: int, rank: int, lunar: bool = False):
     def _init():
-        env = Go2WalkEnv(xml_path=xml_path)
+        env = Go2LunarEnv(xml_path=xml_path) if lunar else Go2WalkEnv(xml_path=xml_path)
         env = Monitor(env)
         env.reset(seed=seed + rank)
         return env
@@ -32,10 +33,20 @@ def make_env(xml_path: Path | None, seed: int, rank: int):
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train Go2 walking with PPO.")
     parser.add_argument("--xml", type=Path, default=None, help="scene path (default: go2_flat_scene.xml)")
+    parser.add_argument("--lunar", action="store_true",
+                        help="use Go2LunarEnv (terrain-relative height) on the lunar hfield scene "
+                             "(default xml go2_lunar_scene.xml). Phase 2.")
     parser.add_argument("--total-timesteps", type=int, default=3_500_000,
                         help="default 3.5M ~= converged (>=97%% of the 5M reward; 5M adds only ~2-3pp). "
                              "Use 2.5M for fast config screening (~93%%). See RESULTS.md convergence note.")
-    parser.add_argument("--num-envs", type=int, default=4) # 这里可以增加至64、1024等
+    parser.add_argument("--num-envs", type=int, default=4) # DummyVecEnv 串行无益；--subproc 下设 ~核数-2
+    parser.add_argument("--subproc", action="store_true",
+                        help="用 SubprocVecEnv：每个环境一个子进程 → 物理跨多核并行（吃满 CPU）。"
+                             "月面 hfield 单核慢，强烈建议配 --num-envs 12 用满 14 核机。"
+                             "默认 DummyVecEnv（单进程串行，只用 1-2 核，向后兼容）。")
+    parser.add_argument("--torch-threads", type=int, default=0,
+                        help="主进程 PPO 更新的 torch 线程数（0=不设，用 torch 默认）。"
+                             "配 --subproc 时建议 4-8，避免与子进程抢核。")
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--run-name", type=str, default="go2_walk")
     parser.add_argument("--device", type=str, default="auto")
@@ -53,11 +64,22 @@ def main() -> None:
                              "verbose=1 still prints the rollout table each update).")
     args = parser.parse_args()
 
+    if args.torch_threads > 0:
+        import torch
+        torch.set_num_threads(args.torch_threads)
+
     run_dir = Path("runs") / args.run_name
     checkpoint_dir = run_dir / "checkpoints"
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    env = DummyVecEnv([make_env(args.xml, args.seed, i) for i in range(args.num_envs)])
+    env_fns = [make_env(args.xml, args.seed, i, args.lunar) for i in range(args.num_envs)]
+    if args.subproc and args.num_envs > 1:
+        # 每个环境一个子进程 → MuJoCo 物理跨核并行。Windows 用 spawn；闭包由 SB3 的
+        # cloudpickle 包装传入子进程（make_env 只捕获 Path/int/bool，可序列化）。
+        env = SubprocVecEnv(env_fns)  # start_method 默认 spawn (Windows)
+        print(f"SubprocVecEnv: {args.num_envs} 子进程并行")
+    else:
+        env = DummyVecEnv(env_fns)
     if args.init_vecnorm:
         # Continue from a previous run's running statistics (e.g. Phase-1 N) so the
         # warm-started policy is fed obs on the scale it was trained on. training=True

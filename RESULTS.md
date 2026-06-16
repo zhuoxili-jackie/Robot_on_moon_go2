@@ -64,6 +64,45 @@
 
 ## 各代结果（最新在上）
 
+### v2.1 — Phase 2 达标：Go2 + Z1 月面高度场迁移 ★ 月面 walker 定型（盲走不摔 + 攀爬）
+
+- **日期**：2026-06-16 ｜ **阶段**：Phase 2（月面迁移 L0–L4）｜ **正式 run**：`go2_lunar_3p5M`（warm-start 自 Phase-3 带臂平地终版 → 月面 hfield → 3.5M，12 env SubprocVecEnv，seed 1）
+- **新增文件**：`go2_lunar_scene.xml`（带 Z1 + hfield 月面场景）、`go2_lunar_env.py`（`Go2LunarEnv`：地形相对高度）、`lunar_assets/`（`make_lunar_hfield.py` 程序化地形生成器 + `lunar_designed_hfield.png`/`_meters.npy`/`_meta.json`/`_preview.png` + vendored `lunar_albedo.png`）。诊断 `diagnostics/inspect_lunar.py` 按约定留本地（gitignore）。
+- **代码改动**：`go2_env.py` 加 `_ground_height()` 钩子（基类返回 0，**对平地行为零改动、回归安全**）；height 奖励 / `min_base_height` / 跌倒判定全改「相对当地地表」。`train_ppo.py` 加 **`--subproc`（SubprocVecEnv 多核）** + `--torch-threads` + `--lunar`；`eval_policy.py`/`play_policy.py` 加 `--lunar`。
+
+**★ 月面地形设计**（`make_lunar_hfield.py`，25m×25m、513²）：原点**平整出生台**（z=0，复刻已验收的带臂平地出生）+ 多倍频**温和滚动起伏**（均坡 4.7°）+ **5 个大小坑**（带环形坑沿）+ **3 个可攀爬山丘**。
+- **大坑「大但可攀爬」**：主坑 big_ne 直径 **7.6m / 深 0.40m**，但抛物面壁仅 **~12°**（盲走可下/上）；全地形最陡 **19.9°**、p99 15.8°。
+- ★ hfield 高度对齐：`world_z = geom_pos_z + zmax·png_norm = 设计高度 H`（令 png_norm=(H−Hmin)/(Hmax−Hmin)、zmax=Hmax−Hmin、geom_pos_z=Hmin）→ 世界地表==设计 H、出生台精确落 z=0。诊断 ray vs 设计 npy 一致性 **1.66mm**。
+
+**★ 地形相对高度（Go2LunarEnv）= 让狗进坑不被误判摔倒的关键**：基类用绝对世界 `qpos[2]`，狗走进 −0.4m 的坑里会跌破 `min_base_height` 被**误判摔倒**。子类用向下 `mj_ray`（只命中 group-0 地形 geom，避开机器人、与 hfield 朝向无关）取 base 正下方地表 z，把高度奖励/健康判定全改相对。obs 仍 54（**暂盲走，无地形高度扫描**）。
+
+**验收：5/6 PASS，6/6 不摔**（`eval_policy.py --lunar`，6 个跨地形回合，放宽月面阈值；出生朝 +x、出生点置于特征西侧使「前进」横穿坑/坡）
+
+| 回合（spawn→cmd） | no_fall | vx_mae | vyaw_mae | duty(FR/FL/RR/RL) | pitch/roll° | min离地 | xy行进 | PASS |
+|---|---|---|---|---|---|---|---|---|
+| pad_fwd（过起伏） | ✓ | 0.033 | 0.052 | .46/.53/.51/.47 | 2.9/0.5 | 0.343 | 4.70 | ✅ |
+| hill_e_climb（爬山丘） | ✓ | 0.051 | 0.074 | .48/.50/.55/.47 | 4.9/1.0 | 0.340 | 5.36 | ✅ |
+| cross_big_w（穿 0.32m 大坑） | ✓ | 0.057 | 0.080 | .49/.50/.52/.46 | 6.1/1.1 | 0.351 | 5.22 | ✅ |
+| med_sw（穿中坑） | ✓ | 0.061 | 0.107 | .45/.52/.50/.49 | 8.4/1.2 | 0.330 | 4.91 | ✅ |
+| yaw_undulate（起伏中转向） | ✓ | 0.050 | 0.130 | .49/.51/.50/.47 | 1.4/0.6 | 0.341 | 2.69 | ✅ |
+| into_big_ne（冲 0.40m 最大坑） | **✓** | 0.373 | 0.047 | .87/.23/1.0/.60 | 1.5/3.4 | 0.333 | 0.34 | ❌(vx/duty) |
+
+- **核心达标**：**6/6 全部不摔**（含最大坑）；爬坡、穿 0.32m 大坑、穿中坑、过起伏、转向全 PASS。满足用户目标「有大坑 + 能攀爬 + 不摔倒」。
+- **唯一未过 = into_big_ne**：在 0.40m 最深坑沿**安全停住、拒绝盲冲下坑**（no_fall ✓、xy 仅 0.34、一足占空比 1.0=站立不动）——盲走机器人合理的保守行为，非摔倒。归为改进项（下）。
+
+#### 迭代历程（change→train→eval 自主循环）
+
+1. **建模 + 首训（陡坑 v2，已删探索 run）**：初版地形 big_ne 深 0.46m / 壁 19°、坑沿局部 31°。warm-start 自平地终版，DummyVecEnv 4 env 训。**1.5M eval 仅 3/6**：起伏/爬坡/转向 PASS，但 **into_big_ne 直接摔**、cross_big_w/med_sw 卡住过不去。
+2. **诊断根因**：**狗是盲走的**（obs 无地形高度）。让看不见地形的狗以 0.4m/s 直冲比自身还高（0.46m）、壁 19–31° 的深坑，物理上难以不摔——250k→1.5M 深坑穿越几乎无改善，证明是**地形过陡**而非训练不足。
+3. **软化大坑（v2 定稿）**：加大坑半径、压低深度、放缓加宽坑沿 → 壁 19°→**12°**、最陡 31°→**19.9°**（视觉仍是直径 6–8m 醒目大坑）。**多核 SubprocVecEnv 12 env 重训**（fps 580→2746，~4.7×，3.5M 从 ~100min→~20min），warm-start 自陡坑 1.5M 权重。**eval 5/6、6/6 不摔**：cross_big_w/med_sw 从「卡住」变「顺畅穿越」，into_big_ne 从「摔」变「安全停沿」。
+
+#### 关键结论
+
+- **「大坑」与「盲走不摔」本质冲突，解法是把坑设计成"大但缓"**：盲走策略能可靠通行的坡度上限约 ≤12–15°（hill 8°、坑壁 12° 均 OK；19–31° 必摔/卡）。大直径 + 缓壁既保留"大坑"观感又可攀爬。
+- **多核是迭代效率的关键**：`DummyVecEnv` 串行只吃 1–2 核；`SubprocVecEnv` 12 env 吃 ~9 核、~4.7× 提速。月面是 hfield，**GPU/MJX 不支持 hfield 碰撞**，CPU 多进程是正解（详见 `TRAINING.md`）。
+- **warm-start 跨域迁移再次奏效**：平地终版→月面起步即 ep_rew ~1.4e3（接近收敛），全程不发散。
+- **env 对平地零回归**：`_ground_height()` 基类恒 0，height/healthy 数学与改前完全一致。
+
 ### v3.1 — Phase 3 达标：Go2 + Z1 配重平地重训（kp45）★ 带臂 walker 定型
 
 - **日期**：2026-06-15 ｜ **阶段**：Phase 3（Z3–Z4：装 Z1 配重平地重训）｜ **正式 run**：`go2_z1_flat_final_3p5M`（warm-start 自无臂 N → 带臂 kp45 模型 → 3.5M，flat，4 env，seed 1）

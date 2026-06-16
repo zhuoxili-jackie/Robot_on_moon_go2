@@ -1,0 +1,43 @@
+<mujoco model="go2_z1 lunar scene">
+  <!-- Phase 2 月面场景：带 Z1 配重的 Go2（go2_z1.xml）+ 程序化设计的月面高度场。
+       地形由 lunar_assets/make_lunar_hfield.py 生成（原点平台 z=0 + 温和起伏 + 大坑 + 山丘）。
+       高度场 geom 仍命名 'lunar_terrain'，env 靠它查地形 / 检测触地。
+
+       ★ 路径解析：go2_z1.xml 的 <compiler meshdir="go2_assets">，而 MuJoCo 用 meshdir 解析
+         hfield 与 mesh 文件 → hfield/texture 用 meshdir 相对路径 ../lunar_assets/...（规避中文路径）。
+
+       ★ hfield 高度对齐（见 meta.json）：world_z = geom_pos_z + zmax·png_norm = 设计高度 H，
+         原点平台精确落在 world z=0，使带臂 'stand' 关键帧（base_z=0.38）出生即贴地。
+           size   = [12.5 12.5 0.791039 0.5]   (rx ry zmax zbase)
+           geom pos_z = -0.473588  (= Hmin)
+       这些数值与 lunar_assets/lunar_designed_meta.json 保持一致；改地形须同步。
+       v2 地形：大坑「大但可攀爬」（坑壁 ~12°，盲走可下/上），最陡 19.9°/p99 15.8°。 -->
+  <include file="go2_z1.xml" />
+
+  <statistic center="0 0 0.1" extent="6" />
+
+  <visual>
+    <!-- 月面：弱环境光 + 低角度强太阳 → 长阴影、高反差，像月球 -->
+    <headlight diffuse="0.45 0.45 0.45" ambient="0.12 0.12 0.13" specular="0.1 0.1 0.1" />
+    <rgba haze="0.03 0.03 0.04 1" />
+    <global azimuth="140" elevation="-25" offwidth="1280" offheight="720" />
+    <map znear="0.02" zfar="60" />
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.04 0.05 0.07" rgb2="0 0 0" width="512" height="3072" />
+    <texture name="lunar_tex" type="2d" file="lunar_assets/lunar_albedo.png" />
+    <material name="lunar_surface" texture="lunar_tex" texrepeat="6 6" texuniform="true"
+      rgba="0.62 0.60 0.56 1" roughness="1" specular="0.03" />
+    <hfield name="lunar_hfield" file="../lunar_assets/lunar_designed_hfield.png"
+      nrow="513" ncol="513" size="12.5 12.5 0.791039 0.5" />
+  </asset>
+
+  <worldbody>
+    <light name="sun" directional="true" pos="-8 -5 12" dir="0.55 0.35 -1"
+      diffuse="0.95 0.92 0.85" ambient="0.05 0.05 0.06" specular="0.18 0.18 0.18" />
+    <geom name="lunar_terrain" type="hfield" hfield="lunar_hfield" pos="0 0 -0.473588"
+      material="lunar_surface" friction="0.9 0.02 0.01" condim="3" priority="1"
+      solref="0.02 1" solimp="0.9 0.95 0.001" />
+  </worldbody>
+</mujoco>

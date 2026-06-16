@@ -32,6 +32,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
 from go2_env import Go2WalkEnv
+from go2_lunar_env import Go2LunarEnv, ray_terrain_height
 from play_policy import patch_sb3_zip_loader
 
 
@@ -48,6 +49,23 @@ THRESHOLDS = {
     "duty_max": 0.85,
 }
 
+# 月面阈值：地形起伏/坑/坡使 pitch/roll/torque/跟踪 必然比平地大，放宽（仍记录全部指标）。
+# 首版值，正式 run 后据实标定。核心验收看 no_fall + 仍能跨地形持续推进。
+LUNAR_THRESHOLDS = {
+    "vx_track_mae_max": 0.20,
+    "vyaw_track_mae_max": 0.32,
+    "flight_frac_max": 0.35,
+    "force_sat_frac_max": 0.18,
+    "action_sat_frac_max": 0.85,
+    "pitch_std_deg_max": 16.0,       # 上下坡身体俯仰
+    "roll_std_deg_max": 16.0,
+    "duty_min": 0.18,
+    "duty_max": 0.92,
+}
+
+# evaluate_thresholds 读这个全局；main 据 --lunar 切换。
+_ACTIVE_THRESHOLDS = THRESHOLDS
+
 
 def euler_from_quat(quat: np.ndarray) -> tuple[float, float]:
     mat = np.empty(9)
@@ -59,12 +77,8 @@ def euler_from_quat(quat: np.ndarray) -> tuple[float, float]:
 
 
 def ground_height(env: Go2WalkEnv) -> float:
-    """Surface z under the robot. Flat scene: the 'lunar_terrain' plane's z (0).
-    Phase 2 (hfield): replace with a height-field lookup at (x, y)."""
-    gid = env.terrain_geom_id
-    if gid < 0:
-        return 0.0
-    return float(env.model.geom_pos[gid, 2])
+    """Surface z under the robot. 用 env 的钩子：平地基类=0；月面子类=hfield 射线地表 z。"""
+    return env._ground_height()
 
 
 def spawn_diagnostic(env: Go2WalkEnv) -> dict:
@@ -85,8 +99,11 @@ def spawn_diagnostic(env: Go2WalkEnv) -> dict:
     }
 
 
-def run_episode(env, vec_norm, model, command, seed, render_dir=None, render_every=4):
-    obs, _ = env.reset(seed=seed, options={"command": command})
+def run_episode(env, vec_norm, model, command, seed, render_dir=None, render_every=4, spawn=None):
+    options = {"command": command}
+    if spawn is not None:
+        options["spawn"] = spawn
+    obs, _ = env.reset(seed=seed, options=options)
     base_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "base_link")
 
     renderer = cam = None
@@ -102,7 +119,7 @@ def run_episode(env, vec_norm, model, command, seed, render_dir=None, render_eve
             print(f"  [render disabled: {type(exc).__name__}: {exc}]")
             renderer = None
 
-    log = {k: [] for k in ("vx", "vy", "wz", "height", "contacts", "action",
+    log = {k: [] for k in ("vx", "vy", "wz", "height", "clearance", "contacts", "action",
                            "joint_pos", "roll", "pitch", "force_sat")}
     start_xy = env.data.qpos[0:2].copy()
     terminated = truncated = False
@@ -120,6 +137,7 @@ def run_episode(env, vec_norm, model, command, seed, render_dir=None, render_eve
         force_sat = float(np.mean(force >= 0.97 * env.model.actuator_forcerange[env.actuator_ids, 1]))
         log["vx"].append(lin[0]); log["vy"].append(lin[1]); log["wz"].append(ang[2])
         log["height"].append(float(env.data.qpos[2]))
+        log["clearance"].append(float(env.data.qpos[2]) - ground_height(env))
         log["contacts"].append(env._foot_contacts().copy())
         log["action"].append(action.copy())
         log["joint_pos"].append(env.data.qpos[env.joint_qpos_adr].copy())
@@ -155,6 +173,8 @@ def run_episode(env, vec_norm, model, command, seed, render_dir=None, render_eve
         "vyaw_track_mae": round(float(np.mean(np.abs(np.array(log["wz"]) - cmd[2]))), 3),
         "xy_distance": round(float(np.linalg.norm(env.data.qpos[0:2] - start_xy)), 2),
         "mean_height": round(float(np.mean(log["height"])), 3),
+        "mean_clearance": round(float(np.mean(log["clearance"])), 3),
+        "min_clearance": round(float(np.min(log["clearance"])), 3),
         "duty_factor_per_foot": [round(float(d), 2) for d in duty],
         "touchdowns_per_sec": [round(float(r / duration), 2) for r in rising],
         "all4_stance_frac": round(float((contacts.sum(axis=1) == 4).mean()), 2),
@@ -176,7 +196,7 @@ def run_episode(env, vec_norm, model, command, seed, render_dir=None, render_eve
 
 
 def evaluate_thresholds(m: dict) -> tuple[dict, bool]:
-    t = THRESHOLDS
+    t = _ACTIVE_THRESHOLDS
     checks = {
         "no_fall": m["no_fall"],
         "vx_track": m["vx_track_mae"] <= t["vx_track_mae_max"],
@@ -226,6 +246,9 @@ def save_frames(frames: list[np.ndarray], out_dir: Path, fps: float) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--xml", default=None, help="scene path (default: go2_flat_scene.xml)")
+    parser.add_argument("--lunar", action="store_true",
+                        help="evaluate on the lunar hfield scene with Go2LunarEnv (terrain-relative "
+                             "height, relaxed thresholds, traversal episodes through craters/hills).")
     parser.add_argument("--run", type=str, default="go2_walk")
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument("--render", action="store_true", help="also dump rendered frames")
@@ -243,8 +266,13 @@ def main() -> None:
     print(f"== loading policy: {model_path}")
     print(f"== loading vecnormalize: {vecnorm_path}")
 
+    global _ACTIVE_THRESHOLDS
     patch_sb3_zip_loader()
-    env = Go2WalkEnv(xml_path=args.xml)
+    if args.lunar:
+        _ACTIVE_THRESHOLDS = LUNAR_THRESHOLDS
+        env = Go2LunarEnv(xml_path=args.xml, randomize_spawn=False)  # spawn 由各回合显式给
+    else:
+        env = Go2WalkEnv(xml_path=args.xml)
     vec = DummyVecEnv([lambda: env])
     vec_norm = VecNormalize.load(vecnorm_path, vec)
     vec_norm.training = False
@@ -258,24 +286,36 @@ def main() -> None:
     if not spawn["ok"]:
         print("  !! spawn height looks wrong (feet floating or penetrating) -- fix before trusting training")
 
-    episodes = [
-        ("fwd_0.3", np.array([0.3, 0.0, 0.0], dtype=np.float32), 10),
-        ("fwd_0.5", np.array([0.5, 0.0, 0.0], dtype=np.float32), 11),
-        ("fwd_0.8", np.array([0.8, 0.0, 0.0], dtype=np.float32), 12),
-        ("fwd_yaw", np.array([0.5, 0.0, 0.4], dtype=np.float32), 13),
-        ("lateral", np.array([0.4, -0.2, 0.0], dtype=np.float32), 14),
-    ]
+    if args.lunar:
+        # 机体出生朝 +x，故 vx>0 = 沿世界 +x；把出生点放在地形特征西侧，让「前进」横穿坑/坡。
+        # (name, cmd[vx,vy,yaw], seed, spawn[x,y])
+        episodes = [
+            ("pad_fwd",      np.array([0.4, 0.0, 0.0], dtype=np.float32), 10, (-1.0, 0.0)),
+            ("hill_e_climb", np.array([0.45, 0.0, 0.0], dtype=np.float32), 11, (3.2, -1.0)),
+            ("into_big_ne",  np.array([0.4, 0.0, 0.0], dtype=np.float32), 12, (2.6, 4.6)),
+            ("cross_big_w",  np.array([0.45, 0.0, 0.0], dtype=np.float32), 13, (-9.2, 1.2)),
+            ("med_sw",       np.array([0.4, 0.0, 0.0], dtype=np.float32), 14, (-8.0, -4.4)),
+            ("yaw_undulate", np.array([0.3, 0.0, 0.35], dtype=np.float32), 15, (0.0, 0.0)),
+        ]
+    else:
+        episodes = [
+            ("fwd_0.3", np.array([0.3, 0.0, 0.0], dtype=np.float32), 10, None),
+            ("fwd_0.5", np.array([0.5, 0.0, 0.0], dtype=np.float32), 11, None),
+            ("fwd_0.8", np.array([0.8, 0.0, 0.0], dtype=np.float32), 12, None),
+            ("fwd_yaw", np.array([0.5, 0.0, 0.4], dtype=np.float32), 13, None),
+            ("lateral", np.array([0.4, -0.2, 0.0], dtype=np.float32), 14, None),
+        ]
     results = {"spawn": spawn}
     n_pass = 0
-    for name, cmd, seed in episodes:
+    for name, cmd, seed, ep_spawn in episodes:
         rdir = out_dir / name
-        metrics = run_episode(env, vec_norm, model, cmd, seed, rdir)
+        metrics = run_episode(env, vec_norm, model, cmd, seed, rdir, spawn=ep_spawn)
         results[name] = metrics
         n_pass += int(metrics["pass"])
         print(f"\n== {name} cmd={cmd.tolist()}  PASS={metrics['pass']} ==")
         for k in ("no_fall", "vx_track_mae", "vyaw_track_mae", "duty_factor_per_foot",
                   "touchdowns_per_sec", "flight_frac", "force_sat_frac", "action_sat_frac",
-                  "pitch_std_deg", "roll_std_deg", "mean_height"):
+                  "pitch_std_deg", "roll_std_deg", "mean_clearance", "min_clearance", "xy_distance"):
             print(f"  {k}: {metrics[k]}")
         print(f"  failed checks: {[k for k, v in metrics['checks'].items() if not v]}")
 

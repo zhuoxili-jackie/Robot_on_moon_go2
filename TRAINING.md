@@ -1,4 +1,4 @@
-# Go2 MuJoCo Locomotion Training (Phase 1 ✅ done → Phase 3: add Z1 arm, then Phase 2 lunar)
+# Go2 MuJoCo Locomotion Training (Phase 1 ✅ → Phase 3 ✅ → Phase 2 ✅ lunar → Phase 4 keyboard)
 
 PPO training setup for the Unitree Go2 on flat ground, ported from
 `TRAINING-Aliengo/`. Same Stable-Baselines3 + MuJoCo stack; the model is the
@@ -9,7 +9,10 @@ an offset around that pose.
 ## Files
 
 - `go2_env.py` — Gymnasium env (`Go2WalkEnv`): 54-d obs, 12-d action, walking reward.
-- `train_ppo.py` — PPO training entry point (Stable-Baselines3).
+- `go2_lunar_env.py` — `Go2LunarEnv(Go2WalkEnv)` (Phase 2): terrain-relative height via
+  downward `mj_ray` on the hfield + cross-terrain spawn. Same 54-d obs (blind, no height scan).
+- `train_ppo.py` — PPO training entry point (Stable-Baselines3). Flags: `--lunar`,
+  `--subproc` (multi-core SubprocVecEnv), `--torch-threads`, `--init-from`/`--init-vecnorm` (warm-start).
 - `play_policy.py` — load and replay a trained policy in the MuJoCo viewer.
 - `eval_policy.py` — headless QUANTITATIVE acceptance: fixed-command rollouts,
   metrics + thresholds + gait plot / contact sheet / gif.
@@ -47,10 +50,28 @@ python smoke_test.py                  # 200 random steps; 54-d finite obs/reward
 # health check first
 python train_ppo.py --total-timesteps 100000 --num-envs 4
 
-# full run (~22 min on CPU; 3.5M is the default)
+# full flat run (~22 min on CPU; 3.5M is the default)
 python train_ppo.py --total-timesteps 3500000 --num-envs 4 `
     --run-name my_run --checkpoint-freq 250000
+
+# ★ MULTI-CORE (strongly recommended): SubprocVecEnv runs one OS process per env so
+#   MuJoCo physics parallelizes across cores. DummyVecEnv (default) is serial → only
+#   1-2 cores. On a 14-core box, --num-envs 12 uses ~9 cores, ~4.7x faster (lunar 3.5M
+#   ~100 min → ~20 min). --torch-threads keeps the PPO update from fighting the env procs.
+python train_ppo.py --subproc --num-envs 12 --torch-threads 4 `
+    --total-timesteps 3500000 --run-name my_run --checkpoint-freq 250000
+
+# ★ LUNAR (Phase 2): hfield terrain + terrain-relative env, warm-started from the flat run.
+python train_ppo.py --lunar --subproc --num-envs 12 --torch-threads 4 `
+    --total-timesteps 3500000 --run-name my_lunar --checkpoint-freq 250000 `
+    --init-from runs/go2_z1_flat_final_3p5M/ppo_go2_final.zip `
+    --init-vecnorm runs/go2_z1_flat_final_3p5M/vecnormalize.pkl
 ```
+
+> GPU/MJX is **not** an option for the lunar scene: MJX doesn't support hfield collision.
+> CPU `--subproc` is the right way to use the cores. Regenerate the terrain with
+> `python lunar_assets/make_lunar_hfield.py` (then sync `go2_lunar_scene.xml`'s hfield
+> `size`/`pos` to the new `lunar_assets/lunar_designed_meta.json`).
 
 Outputs → `runs/<run-name>/`:
 
@@ -76,6 +97,7 @@ python play_policy.py --model runs/go2_gN_tc55_3p5M/ppo_go2_final.zip `
 ```powershell
 python eval_policy.py --run go2_gN_tc55_3p5M            # metrics + gait plot
 python eval_policy.py --run go2_gN_tc55_3p5M --render   # + contact sheet + gif
+python eval_policy.py --lunar --run go2_lunar_3p5M --render   # ★ lunar: relaxed thresholds + crater/hill traversal episodes
 ```
 
 Runs 5 deterministic fixed-command episodes (fwd 0.3 / 0.5 / 0.8, fwd+yaw,

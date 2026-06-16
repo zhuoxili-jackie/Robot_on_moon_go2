@@ -207,6 +207,12 @@ class Go2WalkEnv(gym.Env):
                 nonfoot_geoms.add(g1)
         return float(len(nonfoot_geoms))
 
+    def _ground_height(self) -> float:
+        """地表高度（base 正下方）。平地基类恒为 0，使 height 奖励 / 跌倒判定沿用
+        绝对世界 z 的旧行为（回归安全）。月面子类 Go2LunarEnv 覆写为 hfield 地表 z，
+        把高度全部改成「相对当地地表」—— 否则狗走进坑里 qpos[2] 掉破阈值会被误判摔倒。"""
+        return 0.0
+
     def _gait_phase(self) -> float:
         return float((self.step_count * self.dt / self.gait_cycle_seconds) % 1.0)
 
@@ -244,7 +250,8 @@ class Go2WalkEnv(gym.Env):
 
         projected_gravity = self._projected_gravity()
         upright = float(np.clip(-projected_gravity[2], 0.0, 1.0))
-        height_err = abs(float(self.data.qpos[2]) - self.stand_height)
+        clearance = float(self.data.qpos[2]) - self._ground_height()  # 平地: _ground_height=0
+        height_err = abs(clearance - self.stand_height)
         height = float(np.exp(-(height_err * height_err) / 0.025))  # Gen E: sigma^2 0.030 -> 0.025
 
         contacts = self._foot_contacts()
@@ -288,7 +295,7 @@ class Go2WalkEnv(gym.Env):
 
     def _is_unhealthy(self) -> bool:
         projected_gravity = self._projected_gravity()
-        too_low = float(self.data.qpos[2]) < self.min_base_height
+        too_low = (float(self.data.qpos[2]) - self._ground_height()) < self.min_base_height
         tipped = projected_gravity[2] > -0.35
         bad_number = not np.isfinite(self.data.qpos).all() or not np.isfinite(self.data.qvel).all()
         return bool(too_low or tipped or bad_number)

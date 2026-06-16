@@ -1,0 +1,115 @@
+{
+  "resolution": [
+    513,
+    513
+  ],
+  "half_extent_m": 12.5,
+  "world_xy_extent": [
+    -12.5,
+    12.5,
+    -12.5,
+    12.5
+  ],
+  "hfield_size": [
+    12.5,
+    12.5,
+    0.791039,
+    0.5
+  ],
+  "geom_pos": [
+    0.0,
+    0.0,
+    -0.473588
+  ],
+  "spawn_pad": {
+    "r0": 2.0,
+    "r1": 3.3,
+    "world_z": 0.0
+  },
+  "height_stats_m": {
+    "min": -0.4736,
+    "max": 0.3175,
+    "std": 0.1173
+  },
+  "slope_stats_deg": {
+    "max": 19.9,
+    "mean": 4.72,
+    "p99": 15.8
+  },
+  "craters": [
+    {
+      "name": "big_ne",
+      "cx": 5.8,
+      "cy": 4.8,
+      "r": 3.8,
+      "depth": 0.4,
+      "rim": 0.05,
+      "wall_slope_deg": 11.9
+    },
+    {
+      "name": "big_w",
+      "cx": -6.8,
+      "cy": 1.0,
+      "r": 3.2,
+      "depth": 0.32,
+      "rim": 0.045,
+      "wall_slope_deg": 11.3
+    },
+    {
+      "name": "med_sw",
+      "cx": -5.4,
+      "cy": -4.6,
+      "r": 2.6,
+      "depth": 0.24,
+      "rim": 0.035,
+      "wall_slope_deg": 10.5
+    },
+    {
+      "name": "small_se",
+      "cx": 4.8,
+      "cy": -5.8,
+      "r": 1.6,
+      "depth": 0.13,
+      "rim": 0.022,
+      "wall_slope_deg": 9.2
+    },
+    {
+      "name": "small_n",
+      "cx": 0.2,
+      "cy": 7.6,
+      "r": 1.4,
+      "depth": 0.11,
+      "rim": 0.02,
+      "wall_slope_deg": 8.9
+    }
+  ],
+  "hills": [
+    {
+      "name": "hill_e",
+      "cx": 6.8,
+      "cy": -1.0,
+      "height": 0.3,
+      "sigma": 2.4,
+      "max_slope_deg": 4.3
+    },
+    {
+      "name": "mound_nw",
+      "cx": -3.4,
+      "cy": 5.6,
+      "height": 0.26,
+      "sigma": 1.5,
+      "max_slope_deg": 6.0
+    },
+    {
+      "name": "ridge_climb",
+      "cx": 1.6,
+      "cy": -7.6,
+      "height": 0.34,
+      "sigma": 1.7,
+      "max_slope_deg": 6.9
+    }
+  ],
+  "friction_note": "1.0 0.02 0.01",
+  "png_file": "lunar_designed_hfield.png",
+  "npy_file": "lunar_designed_heightfield_meters.npy"
+}
